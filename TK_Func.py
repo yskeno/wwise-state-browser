@@ -5,7 +5,7 @@ from pprint import pprint
 
 
 class MainWindow(tkinter.Tk):
-    def __init__(self):
+    def __init__(self, isautosync=True, visibleonlyname=True):
         super().__init__()
 
         self.title("State Browser Tool")
@@ -14,9 +14,8 @@ class MainWindow(tkinter.Tk):
         self.minsize(750, 220)
 
         # Variables.
-        self.isautoupdate = tkinter.BooleanVar(value=True)
-        self.isautosetstate = tkinter.BooleanVar(value=True)
-        self.visibleonlyname = tkinter.BooleanVar(value=True)
+        self.isautosync = tkinter.BooleanVar(value=isautosync)
+        self.visibleonlyname = tkinter.BooleanVar(value=visibleonlyname)
 
         self._lbltxt_wproj_info = tkinter.StringVar()
         self._btntxt_connectwaapi = tkinter.StringVar()
@@ -38,30 +37,27 @@ class MainWindow(tkinter.Tk):
         self.btn_updatestate = ttk.Button(self.frame_settings,
                                           text="Force Update",
                                           state='disabled',
-                                          padding=3,
-                                          command=lambda: print(
-                                              self.isautoupdate.get()))
+                                          padding=3,)
         self.btn_updatestate.grid(column=0, row=0, padx=3, pady=0)
-
-        self.chk_autoupdate = ttk.Checkbutton(self.frame_settings,
-                                              text="Auto Update State Browser",
-                                              padding=3,
-                                              variable=self.isautoupdate,
-                                              )
-        self.chk_autoupdate.grid(column=1, row=0, padx=3, pady=0)
 
         self.btn_setstate = ttk.Button(self.frame_settings,
                                        text="Set State", padding=3,
-                                       state='disabled',
-                                       command=lambda: print(
-                                           self.isautosetstate.get()))
-        self.btn_setstate.grid(column=2, row=0, padx=3, pady=0)
+                                       state='disabled')
+        self.btn_setstate.grid(column=1, row=0, padx=3, pady=0)
 
-        self.chk_autosetstate = ttk.Checkbutton(self.frame_settings,
-                                                text="Auto Set State When State Changed",
-                                                padding=3,
-                                                variable=self.isautosetstate)
-        self.chk_autosetstate.grid(column=3, row=0, padx=3, pady=0)
+        self.chk_autosync = ttk.Checkbutton(self.frame_settings,
+                                            text="Auto Sync StateBrowser with Wwise",
+                                            padding=3,
+                                            variable=self.isautosync,
+                                            )
+        self.chk_autosync.grid(column=2, row=0, padx=3, pady=0)
+
+        self.chk_visibleonlyname = ttk.Checkbutton(self.frame_settings,
+                                                   text="Visible Only StateGroup Name",
+                                                   padding=3,
+                                                   variable=self.visibleonlyname,
+                                                   command=self.__toggle_stategroup_title)
+        self.chk_visibleonlyname.grid(column=3, row=0, padx=3, pady=0)
 
         # Design Status Frame.
         self.frame_status = ttk.Labelframe(self,
@@ -88,27 +84,10 @@ class MainWindow(tkinter.Tk):
         self.frame_statebrowser.grid(column=0, row=1, sticky="nsew",
                                      padx=10, pady=3, ipadx=2, ipady=0)
 
-        # Design State Settings.
-        self.frame_statesettings = ttk.Frame(self.frame_statebrowser,
-                                             padding=3)
-        self.frame_statesettings.grid(column=0, row=0, sticky="EW")
-
-        self.chk_visibleonlyname = ttk.Checkbutton(self.frame_statesettings,
-                                                   text="Visible Only StateGroup Name",
-                                                   padding=3,
-                                                   variable=self.visibleonlyname
-                                                   )
-        self.chk_visibleonlyname.grid(column=0, row=0, padx=3, pady=0)
-
-        # Design State List.
-        self.frame_statelist = ttk.Frame(self.frame_statebrowser,
-                                         padding=3, border=1, relief="solid")
-        self.frame_statelist.grid(column=0, row=1, sticky="NSEW")
-
-        self.lbl_title_stategroup = ttk.Label(self.frame_statelist,
+        self.lbl_title_stategroup = ttk.Label(self.frame_statebrowser,
                                               text="StateGroup", width=25, anchor="center")
         self.lbl_title_stategroup.grid(column=0, row=0, sticky="EW")
-        self.lbl_title_statename = ttk.Label(self.frame_statelist,
+        self.lbl_title_statename = ttk.Label(self.frame_statebrowser,
                                              text="State", width=50, anchor="center")
         self.lbl_title_statename.grid(column=1, row=0, sticky="EW")
 
@@ -135,9 +114,9 @@ class MainWindow(tkinter.Tk):
             self.btn_setstate['state'] = 'disabled'
 
     def clear_statebrowser(self):
-        for stategroupname in self.dict_statebrowser_object.keys():
-            self.dict_statebrowser_object[stategroupname]['Label'].destroy()
-            self.dict_statebrowser_object[stategroupname]['ComboBox'].destroy()
+        for stategroup in self.dict_statebrowser_object.keys():
+            self.dict_statebrowser_object[stategroup]['Label'].destroy()
+            self.dict_statebrowser_object[stategroup]['ComboBox'].destroy()
         self.dict_statebrowser_object.clear()
         self.dict_changedstate.clear()
 
@@ -148,17 +127,17 @@ class MainWindow(tkinter.Tk):
         for stategroup_id, stategroup_info in stateinfo.items():
             self.dict_statebrowser_object.setdefault(
                 stategroup_id, {}).setdefault(
-                    'Label', ttk.Label(self.frame_statelist,
+                    'Label', ttk.Label(self.frame_statebrowser,
                                        name="lbl_"+stategroup_id,
-                                       text=stategroup_info.get('path', ""),
+                                       #    text=stategroup_info.get('path', ""),
                                        width=50, border=1, relief="solid"))
 
             combobox_values = []
             for i in stategroup_info.get('state', []):
                 combobox_values.append(i)
-
+            # Create State ComboBox.
             self.dict_statebrowser_object[stategroup_id].setdefault(
-                'ComboBox', ttk.Combobox(self.frame_statelist,
+                'ComboBox', ttk.Combobox(self.frame_statebrowser,
                                          name=stategroup_id,
                                          state='readonly',
                                          width=50,
@@ -168,37 +147,41 @@ class MainWindow(tkinter.Tk):
                 '<<ComboboxSelected>>', self.__add_changedstate_dict)
 
             for i in range(len(self.dict_statebrowser_object)):
+                # Browser column title is placed row=0, so start row=1.
                 self.dict_statebrowser_object[stategroup_id]['Label'].grid(
                     column=0, row=i+1, sticky="EW")
                 self.dict_statebrowser_object[stategroup_id]['ComboBox'].grid(
                     column=1, row=i+1, sticky="EW")
-
+            # Set ComboBox value to current State.
             self.dict_statebrowser_object[stategroup_id]['ComboBox'].set(
                 stategroup_info.get('current'))
 
-    def update_current_state(self, currentstate_dict: dict):
-        for stategroup, currentstate in currentstate_dict.items():
-            self.dict_statebrowser_object.get(stategroup, {}).get(
-                'ComboBox').set(currentstate)
+        self.__toggle_stategroup_title()
+
+    def __toggle_stategroup_title(self):
+        if self.visibleonlyname.get() == True:
+            for stategroup in self.dict_statebrowser_object.keys():
+                self.dict_statebrowser_object[stategroup]['Label'].config(
+                    text=self.dict_statebrowser_old.get(stategroup, {}).get('path', "").split('\\')[-1])
+        else:
+            for stategroup in self.dict_statebrowser_object.keys():
+                self.dict_statebrowser_object[stategroup]['Label'].config(
+                    text=self.dict_statebrowser_old.get(stategroup, {}).get('path', ""))
 
     def __add_changedstate_dict(self, event):
-        # Already listed in dict_changedstate?
-        pprint(self.dict_changedstate.keys())
-        if event.widget._name in self.dict_changedstate.keys():
-            # Same State in Wwise?
-            print("self.dict_statebrowser_old[event.widget._name]")
-            pprint(self.dict_statebrowser_old[event.widget._name].get('state'))
-            print("event.widget.get()")
-            pprint(event.widget.get())
-            if self.dict_statebrowser_old[event.widget._name] == event.widget.get():
-                # Delete existed key because you changed to same state in Wwise.
-                del self.dict_changedstate[event.widget._name]
-                return
+        # NOT NEED IF STATE FOR ALREADY CHANGED:
+        #   When change state again and again, need to update stateinfo sync to setted state by ownself.
+        #   It's not efficiency so if state is omitted.
 
+        # # Already listed in dict_changedstate?
+        # if event.widget._name in self.dict_changedstate.keys():
+        #     # Same State in Wwise?
+        #     if self.dict_statebrowser_old[event.widget._name].get('current') == event.widget.get():
+        #         # Delete existed key because you changed to same state in Wwise.
+        #         del self.dict_changedstate[event.widget._name]
+        #         return
         # Add new State in dict_changedstate.
-        self.dict_changedstate[event.widget._name] = event.widget.get(
-        )
-        pprint(self.dict_changedstate)
+        self.dict_changedstate[event.widget._name] = event.widget.get()
 
 
 if __name__ == "__main__":

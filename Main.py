@@ -51,9 +51,8 @@ def update_state_browsertool(rootwd: TK_Func.MainWindow, client: WAAPI_Func.Waap
 
 
 def set_changed_state(rootwd: TK_Func.MainWindow, client: WAAPI_Func.WaapiClient_StateTool):
-    for changedstategroup_name, changedstate_name in rootwd.dict_statebrowser_changed.items():
-        client.set_state(changedstategroup_name.split('\\')[-1],
-                         changedstate_name)
+    for stategroup_id, state_name in rootwd.dict_changedstate.items():
+        client.set_state(stategroup_id, state_name)
 
 
 def close_main_window(rootwd, client):

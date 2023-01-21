@@ -5,7 +5,7 @@ from pprint import pprint
 
 
 class MainWindow(tkinter.Tk):
-    def __init__(self, isautosync=True, visibleonlyname=True):
+    def __init__(self, enableautosync=True, visibleonlyname=True):
         super().__init__()
 
         self.title("State Browser Tool")
@@ -14,7 +14,7 @@ class MainWindow(tkinter.Tk):
         self.minsize(750, 220)
 
         # Variables.
-        self.isautosync = tkinter.BooleanVar(value=isautosync)
+        self.enableautosync = tkinter.BooleanVar(value=enableautosync)
         self.visibleonlyname = tkinter.BooleanVar(value=visibleonlyname)
 
         self._lbltxt_wproj_info = tkinter.StringVar()
@@ -48,7 +48,7 @@ class MainWindow(tkinter.Tk):
         self.chk_autosync = ttk.Checkbutton(self.frame_settings,
                                             text="Auto Sync StateBrowser with Wwise",
                                             padding=3,
-                                            variable=self.isautosync,
+                                            variable=self.enableautosync,
                                             )
         self.chk_autosync.grid(column=2, row=0, padx=3, pady=0)
 

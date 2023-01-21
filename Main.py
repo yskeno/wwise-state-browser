@@ -1,5 +1,6 @@
 #! python3
-import sys
+import os
+import configparser
 
 import WAAPI_Func
 import TK_Func
@@ -33,7 +34,6 @@ def disconnect_from_wwise(rootwd: TK_Func.MainWindow, client: WAAPI_Func.WaapiCl
     rootwd.btn_updatestate['command'] = None
     rootwd.btn_setstate['command'] = None
     rootwd.update_wproj_info()
-    rootwd.clear_statebrowseer()
 
 
 def bind_tkinter_to_waapi(rootwd: TK_Func.MainWindow, client: WAAPI_Func.WaapiClient_StateTool):
@@ -55,14 +55,34 @@ def set_changed_state(rootwd: TK_Func.MainWindow, client: WAAPI_Func.WaapiClient
         client.set_state(stategroup_id, state_name)
 
 
-def close_main_window(rootwd, client):
+def sync_state_browser(rootwd: TK_Func.MainWindow, client: WAAPI_Func.WaapiClient_StateTool):
+    # TODO:Add Function.
+    pass
+
+
+def close_main_window(rootwd: TK_Func.MainWindow, client: WAAPI_Func.WaapiClient_StateTool):
     if isinstance(client, WAAPI_Func.WaapiClient_StateTool):
         client.disconnect()
         client = None
+    with open('WwiseBrowserTool.ini', 'w') as ini:
+        config['SETTINGS'] = {'enableautosync': rootwd.enableautosync.get(),
+                              'visibleonlyname': rootwd.visibleonlyname.get()}
+        config.write(ini)
     rootwd.destroy()
 
 
-rootwd = TK_Func.MainWindow()
+config = configparser.ConfigParser()
+if not os.path.exists(os.getcwd()+"\\WwiseBrowserTool.ini"):
+    with open('WwiseBrowserTool.ini', 'w') as ini:
+        config['DEFAULT'] = {'enableautosync': True,
+                             'visibleonlyname': True}
+        config['SETTINGS'] = {'enableautosync': True,
+                              'visibleonlyname': True}
+        config.write(ini)
+config.read('WwiseBrowserTool.ini')
+
+rootwd = TK_Func.MainWindow(
+    config['SETTINGS']['enableautosync'], config['SETTINGS']['visibleonlyname'])
 rootwd.btn_connectwaapi['command'] = lambda: connect_to_wwise(rootwd)
 
 client = connect_to_wwise(rootwd)

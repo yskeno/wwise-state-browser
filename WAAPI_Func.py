@@ -92,7 +92,11 @@ class WaapiClient_StateTool(WaapiClient):
                         "return": ["id", "name"]}  # "parent.id" & "parent.path" is necessary?
                 }).get('return', {}).get('name', ""))
 
-        return ret
+        # Sort return dict by path.
+        ret_sorted = {}
+        for k, v in sorted(ret.items(), key=lambda x: x[1]['path']):
+            ret_sorted[k] = v
+        return ret_sorted
 
     def __get_stategroup_info(self) -> dict:
         """Return StateGroup information as dict.\n

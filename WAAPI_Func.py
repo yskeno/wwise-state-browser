@@ -22,7 +22,7 @@ class WaapiClient_StateTool(WaapiClient):
     def __init__(self):
         super().__init__()
 
-        self.statedict = {}
+        self.set_subscription()
 
     def is_connected(self) -> bool:
         if super().is_connected() is None:
@@ -30,108 +30,144 @@ class WaapiClient_StateTool(WaapiClient):
         else:
             return super().is_connected()
 
-    def get_wproj_info(self) -> str:
+    def get_wproj_info(self) -> dict:
         """
         Return wproj name and path as str.
-        '(wproj_name)<(wproj_path)>'
+        {'name': wproj_name',
+        'filePath': 'wproj_path'}
         """
 
         wproj_object = self.call("ak.wwise.core.object.get", {
             "from": {
                 "ofType": ["Project"]},
             "options": {
-                "return": ["name", "filePath",]}
+                "return": ["name", "filePath"]}
         })
-        return wproj_object['return'][0]['name'] + " <" + wproj_object['return'][0]['filePath'] + ">"
+        return {'name': wproj_object['return'][0]['name'],
+                'filePath': wproj_object['return'][0]['filePath']}
 
-    def __get_stategroup_list(self) -> list:
-        stategroup_list = self.call("ak.wwise.core.object.get", {
+    def update_state_info(self) -> dict:
+        """Return State information.\n
+    Args:
+
+    Returns:
+        dict: State information.\n
+        {'StateGroup GUID': {'path': 'StateGroup Name',
+                                  'state': ['State Name', 'State Name', ...],
+                                  'current': 'State name'}
+        """
+        ret = {}
+        stategrouplist = self.call("ak.wwise.core.object.get", {
             "from": {
                 "ofType": ["StateGroup"]},
             "options": {
-                "return": ["id", "name", "path"]}
-        })
-        return stategroup_list["return"]
+                "return": ["id", "path"]}
+        }).get('return', [])
 
-    def __get_stateinfo_list(self, stategroup_id: str) -> list:
-        state_info = self.call("ak.wwise.core.object.get", {
-            "from": {
-                "id": [stategroup_id]},
-            "transform": [
-                {"select": ["children"]},
-                {"where": ["type:isIn", ["State"]]}],
-            "options": {
-                "return": ["id", "name"]}
-        })
-        return state_info["return"]
-
-    def get_state_dict(self) -> dict:
-        """
-        Return state dict.\n
-        ex.) {"\\State\\WorkUnit\\StGroup_A": [{'id': '{00000000-1111-2222-3333-444444444444}'\n
-                                                                  'name': "StGroup_A_ON"},\n
-                                                                  {'id': '{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}',\n
-                                                                  'name': "StGroup_A_OFF"]}
-        """
-        ret = {}
-
-        stategroup_list = self.__get_stategroup_list()
-        for each_stategroup in stategroup_list:
-            # Make Key as StateGroup path.
-            ret.setdefault(each_stategroup['path'], [])
+        for stategroup in stategrouplist:
+            ret[stategroup['id']] = {
+                'path': stategroup['path']}
 
             # Get All State Info from Each StateGroup.
-            all_state_info = self.__get_stateinfo_list(each_stategroup['id'])
+            state_list = self.call("ak.wwise.core.object.get", {
+                "from": {
+                    "id": [stategroup['id']]},
+                "transform": [
+                    {"select": ["children"]},
+                    {"where": ["type:isIn", ["State"]]}],
+                "options": {
+                    "return": ["id", "name"]}
+            }).get('return', [])
 
             # Add Each State as List.
-            for each_state_info in all_state_info:
-                ret[each_stategroup['path']].append(
-                    {'id': each_state_info['id'], 'name': each_state_info['name']})
+            for state in state_list:
+                ret[stategroup['id']].setdefault(
+                    'state', []).append(state['name'])
+
+            # Add current State info.
+            ret[stategroup['id']].setdefault('current', self.call(
+                "ak.soundengine.getState", {
+                    "stateGroup": stategroup['id'],
+                    "options": {
+                        "return": ["id", "name"]}  # "parent.id" & "parent.path" is necessary?
+                }).get('return', {}).get('name', ""))
+
         return ret
 
-    def get_currentstate_dict(self) -> dict:
-        currentstate_dict = {}
-        statedict = self.get_state_dict()
-        for stategrouppath in statedict.keys():
-            currentstate_dict.setdefault(
-                stategrouppath, self.__get_current_state(stategrouppath)['name'])
-            self.__get_current_state(stategrouppath)
-        return currentstate_dict
+    def __get_stategroup_info(self) -> dict:
+        """Return StateGroup information as dict.\n
+    Args:
 
-    def __get_current_state(self, stategroup_path: str) -> dict:
+    Returns:
+        dict: StateGroup information.\n
+        ex.) {'{StateGroupA GUID}': {'id': '{StateGroupA GUID}'\n
+                                                     'path': '\\States\\Default WorkUnit\\StGroup_A'},\n
+                '{StateGroupB GUID}': {'id': '{StateGroupB GUID}',\n
+                                                     'path': '\\States\\Default WorkUnit\\StGroup_B'}}
         """
-        Return current state.\n
-        ex.) {'id': '{00000000-1111-2222-3333-444444444444}',
+        stategrouplist = self.call("ak.wwise.core.object.get", {
+            "from": {
+                "ofType": ["StateGroup"]},
+            "options": {
+                "return": ["id", "path"]}
+        }).get('return', [])
+        ret = {}
+        for stategroup in stategrouplist:
+            ret[stategroup['id']] = {
+                'id': stategroup['id'],
+                'path': stategroup['path']}
+        return ret
+
+    def __get_current_state(self) -> dict:
+        """
+        Return current State in Wwise as dict.
+                ex.) {'id': '{00000000-1111-2222-3333-444444444444}',
                 'name': 'StateA',
+                'parent.id': 
                 'parent.path': '\\States\\Default Work Unit\\StateGroup'}
         """
-        ret = self.call("ak.soundengine.getState", {
-            "stateGroup": stategroup_path,
-            "options": {
-                "return": ["id", "name", "parent.path"]}
-        })
-        return ret["return"]
+        ret = {}
+        stategroup_dict = self.__get_stategroup_info()
+        for stategroup in stategroup_dict.values():
+            ret.setdefault(stategroup['id'], self.call("ak.soundengine.getState", {
+                "stateGroup": stategroup['id'],
+                "options": {
+                    "return": ["id", "name", "parent.path"]}
+            }).get('return', {}))
+        return ret
 
-    def set_state(self, stategroup_name: str, state: str):
-        self.call("ak.soundengine.setState", {
-            "stateGroup": stategroup_name,
-            "state": state
-        })
+    def set_state(self, stategroup: str, state: str) -> bool:
+        """Return StateGroup information as dict.\n
+    Args:
+        stategroup (str): Either the ID(GUID), name, or Short ID of the State Group.
+        state (str): Either the ID(GUID), name, or Short ID of the State.
+    Returns:
+        bool: True for success, False otherwise.
+        """
+        try:
 
-    # Callback function with a matching signature.
+            self.call("ak.soundengine.setState", {
+                "stateGroup": stategroup,
+                "state": state
+            })
+            return True
+        except:
+            return False
+
+    # Callback function with F matching signature.
     # Signature (*args, **kwargs) matches anything, with results being in kwargs.
     def set_subscription(self):
         self.subscribe("ak.wwise.core.object.nameChanged",
-                       self.__func_statename_changed, {"return": ["type"]})
+                       self.subscribe_statename_changed, {"return": ["type"]})
         self.subscribe("ak.wwise.core.profiler.stateChanged",
-                       self.__func_state_changed, {"return": ["id", "name"]})
+                       self.subscribe_state_changed, {"return": ["id", "name"]})
 
-    def __func_statename_changed(self, *args, **kwargs):
+    def subscribe_statename_changed(self, *args, **kwargs):
         if kwargs.get("object", {}).get("type") != "State" and kwargs.get("object", {}).get("type") != "StateGroup":
             return
         print(kwargs.get("oldName")+" to "+kwargs.get("newName"))
 
-    def __func_state_changed(self, *args, **kwargs):
+    def subscribe_state_changed(self, *args, **kwargs):
         print("!!! State Changed !!!")
         pprint(args)
         pprint(kwargs)
@@ -159,15 +195,18 @@ if __name__ == "__main__":
         print(client.get_wproj_info())
 
         # Get State List
-        print("*** Get State List: get_state_dict()")
-        pprint(client.get_state_dict())
+        print("*** Get State Dict: update_state_info()")
+        pprint(client.update_state_info())
 
-        client.set_state("PlayerInWater", "No")
+        client.set_state("{5ABE43F7-5E44-4F37-AE07-BC265DDCC34E}",
+                         "{CD350719-7205-45AC-B57A-2FB2E1E492AD}")
 
-        print("*** Get Current State: get_currentstate_dict()")
-        pprint(client.get_currentstate_dict())
+        print("*** Get Current State: __get_current_state()")
+        pprint(client.__get_current_state())
 
-        print("*** Subscribe")
-        handler = client.set_subscription()
+        # print("*** Subscribe")
+        # handler = client.set_subscription()
+
+        client.disconnect()
 
         print("*** EOF")

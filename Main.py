@@ -18,7 +18,7 @@ def connect_to_wwise(rootwd: TK_Func.MainWindow):
                         lambda: close_main_window(rootwd, client))
         rootwd.update_wproj_info(True, client.get_wproj_info())
         rootwd.update_statebrowser(
-            client.get_state_dict(), client.get_currentstate_dict())
+            client.update_state_info())
         bind_tkinter_to_waapi(rootwd, client)
         return client
     except WAAPI_Func.CannotConnectToWaapiException:
@@ -46,8 +46,7 @@ def bind_tkinter_to_waapi(rootwd: TK_Func.MainWindow, client: WAAPI_Func.WaapiCl
 
 
 def update_state_browsertool(rootwd: TK_Func.MainWindow, client: WAAPI_Func.WaapiClient_StateTool):
-    rootwd.update_statebrowser(
-        client.get_state_dict(), client.get_currentstate_dict())
+    rootwd.update_statebrowser(client.update_state_info())
     return
 
 

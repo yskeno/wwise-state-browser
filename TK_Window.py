@@ -1,7 +1,6 @@
 #! python3
 import tkinter
 import tkinter.ttk as ttk
-from pprint import pprint
 
 
 class MainWindow(tkinter.Tk):
@@ -20,11 +19,12 @@ class MainWindow(tkinter.Tk):
         self._lbltxt_wproj_info = tkinter.StringVar()
         self._btntxt_connectwaapi = tkinter.StringVar()
 
+        self.dict_wproj_info = {}
+        self.dict_state_in_wwise = {}
         # { 'StateGroup' : {'Label' : LabelObject<StateGroupName>,
         #                   'ComboBox' : ComboBoxObject<StateName> }
         self.dict_statebrowser_object = {}
-        self.dict_statebrowser_old = {}
-        # { 'StateGroup GUID' : 'NewState Name' }
+        # { 'StateGroup GUID' : 'State Name' }
         self.dict_changedstate = {}
 
         # Design Settings Frame.
@@ -56,7 +56,7 @@ class MainWindow(tkinter.Tk):
                                                    text="Visible Only StateGroup Name",
                                                    padding=3,
                                                    variable=self.visibleonlyname,
-                                                   command=self.__toggle_stategroup_title)
+                                                   command=self.__on_toggle_visibleonlyname)
         self.chk_visibleonlyname.grid(column=3, row=0, padx=3, pady=0)
 
         # Design Status Frame.
@@ -97,11 +97,10 @@ class MainWindow(tkinter.Tk):
         self._lbltxt_wproj_info.set("Connecting to Wwise...")
         self.lbl_wproj_info.update()
 
-    def update_wproj_info(self, isconnected=False, wprojinfo: dict = {'name': "",
-                                                                      'filePath': ""}):
+    def update_wproj_info(self, isconnected=False):
         if isconnected == True:
             self._lbltxt_wproj_info.set(
-                "Connected: " + wprojinfo['name'] + "<"+wprojinfo['filePath'] + ">")
+                "Connected: " + self.dict_wproj_info.get('name', "") + "<"+self.dict_wproj_info.get('filePath', "") + ">")
             self._btntxt_connectwaapi.set("Disconnect")
             self.btn_connectwaapi['state'] = 'normal'
             self.btn_updatestate['state'] = 'normal'
@@ -120,11 +119,10 @@ class MainWindow(tkinter.Tk):
         self.dict_statebrowser_object.clear()
         self.dict_changedstate.clear()
 
-    def update_statebrowser(self, stateinfo: dict):
+    def update_statebrowser(self):
         self.clear_statebrowser()
-        self.dict_statebrowser_old = stateinfo
         # Create StateGroupName Label.
-        for stategroup_id, stategroup_info in stateinfo.items():
+        for stategroup_id, stategroup_info in self.dict_state_in_wwise.items():
             self.dict_statebrowser_object.setdefault(
                 stategroup_id, {}).setdefault(
                     'Label', ttk.Label(self.frame_statebrowser,
@@ -132,10 +130,11 @@ class MainWindow(tkinter.Tk):
                                        #    text=stategroup_info.get('path', ""),
                                        width=50, border=1, relief="solid"))
 
+            # Create State ComboBox.
             combobox_values = []
             for i in stategroup_info.get('state', []):
                 combobox_values.append(i)
-            # Create State ComboBox.
+
             self.dict_statebrowser_object[stategroup_id].setdefault(
                 'ComboBox', ttk.Combobox(self.frame_statebrowser,
                                          name=stategroup_id,
@@ -144,7 +143,7 @@ class MainWindow(tkinter.Tk):
                                          values=combobox_values,))
             self.dict_statebrowser_object[stategroup_id]['ComboBox'].current(0)
             self.dict_statebrowser_object[stategroup_id]['ComboBox'].bind(
-                '<<ComboboxSelected>>', self.__add_changedstate_dict)
+                '<<ComboboxSelected>>', self.__on_state_combobox_changed)
 
             for i in range(len(self.dict_statebrowser_object)):
                 # Browser column title is placed row=0, so start row=1.
@@ -152,34 +151,32 @@ class MainWindow(tkinter.Tk):
                     column=0, row=i+1, sticky="EW")
                 self.dict_statebrowser_object[stategroup_id]['ComboBox'].grid(
                     column=1, row=i+1, sticky="EW")
+
             # Set ComboBox value to current State.
             self.dict_statebrowser_object[stategroup_id]['ComboBox'].set(
                 stategroup_info.get('current'))
 
-        self.__toggle_stategroup_title()
+        # Set Label text.
+        self.__on_toggle_visibleonlyname()
 
-    def __toggle_stategroup_title(self):
+    def __on_toggle_visibleonlyname(self):
         if self.visibleonlyname.get() == True:
             for stategroup in self.dict_statebrowser_object.keys():
                 self.dict_statebrowser_object[stategroup]['Label'].config(
-                    text=self.dict_statebrowser_old.get(stategroup, {}).get('path', "").split('\\')[-1])
+                    text=self.dict_state_in_wwise.get(stategroup, {}).get('path', "").split('\\')[-1])
         else:
             for stategroup in self.dict_statebrowser_object.keys():
                 self.dict_statebrowser_object[stategroup]['Label'].config(
-                    text=self.dict_statebrowser_old.get(stategroup, {}).get('path', ""))
+                    text=self.dict_state_in_wwise.get(stategroup, {}).get('path', ""))
 
-    def __add_changedstate_dict(self, event):
-        # NOT NEED IF STATE FOR ALREADY CHANGED:
-        #   When change state again and again, need to update stateinfo sync to setted state by ownself.
-        #   It's not efficiency so if state is omitted.
-
-        # # Already listed in dict_changedstate?
-        # if event.widget._name in self.dict_changedstate.keys():
-        #     # Same State in Wwise?
-        #     if self.dict_statebrowser_old[event.widget._name].get('current') == event.widget.get():
-        #         # Delete existed key because you changed to same state in Wwise.
-        #         del self.dict_changedstate[event.widget._name]
-        #         return
+    def __on_state_combobox_changed(self, event):
+        # Already listed in dict_changedstate?
+        if event.widget._name in self.dict_changedstate.keys():
+            # Same State in Wwise?
+            if self.dict_state_in_wwise[event.widget._name].get('current') == event.widget.get():
+                # Delete existed key because you changed to same state in Wwise.
+                del self.dict_changedstate[event.widget._name]
+                return
         # Add new State in dict_changedstate.
         self.dict_changedstate[event.widget._name] = event.widget.get()
 

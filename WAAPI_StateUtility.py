@@ -1,11 +1,15 @@
 #! python3
-
 from waapi import WaapiClient, CannotConnectToWaapiException
-import atexit
 from pprint import pprint
 
 
-class WaapiClient_StateTool(WaapiClient):
+class WaapiClient_StateUtility(WaapiClient):
+    # {'StateGroup GUID': {'path': 'StateGroup Name',
+    #                       'state': ['State Name', 'State Name', ...],
+    #                       'current': 'State name'}
+    wproj_info = {}
+    state_in_wwise = {}
+
     # for Singleton design pattern.
     __instance = None
 
@@ -21,7 +25,8 @@ class WaapiClient_StateTool(WaapiClient):
 
     def __init__(self):
         super().__init__()
-
+        self.update_wproj_info()
+        self.update_state_info()
         self.set_subscription()
 
     def is_connected(self) -> bool:
@@ -30,7 +35,7 @@ class WaapiClient_StateTool(WaapiClient):
         else:
             return super().is_connected()
 
-    def get_wproj_info(self) -> dict:
+    def update_wproj_info(self) -> dict:
         """
         Return wproj name and path as str.
         {'name': wproj_name',
@@ -41,10 +46,12 @@ class WaapiClient_StateTool(WaapiClient):
             "from": {
                 "ofType": ["Project"]},
             "options": {
-                "return": ["name", "filePath"]}
-        })
-        return {'name': wproj_object['return'][0]['name'],
-                'filePath': wproj_object['return'][0]['filePath']}
+                "return": ["name", "filePath"]}})
+
+        WaapiClient_StateUtility.wproj_info = {'name': wproj_object['return'][0]['name'],
+                                               'filePath': wproj_object['return'][0]['filePath']}
+
+        return WaapiClient_StateUtility.wproj_info
 
     def update_state_info(self) -> dict:
         """Return State information.\n
@@ -53,10 +60,11 @@ class WaapiClient_StateTool(WaapiClient):
     Returns:
         dict: State information.\n
         {'StateGroup GUID': {'path': 'StateGroup Name',
-                                  'state': ['State Name', 'State Name', ...],
-                                  'current': 'State name'}
+                                          'state': ['State Name', 'State Name', ...],
+                                          'current': 'State name'}
         """
         ret = {}
+        # Get All StateGroup Info.
         stategrouplist = self.call("ak.wwise.core.object.get", {
             "from": {
                 "ofType": ["StateGroup"]},
@@ -93,52 +101,10 @@ class WaapiClient_StateTool(WaapiClient):
                 }).get('return', {}).get('name', ""))
 
         # Sort return dict by path.
-        ret_sorted = {}
         for k, v in sorted(ret.items(), key=lambda x: x[1]['path']):
-            ret_sorted[k] = v
-        return ret_sorted
+            WaapiClient_StateUtility.state_in_wwise[k] = v
 
-    def __get_stategroup_info(self) -> dict:
-        """Return StateGroup information as dict.\n
-    Args:
-
-    Returns:
-        dict: StateGroup information.\n
-        ex.) {'{StateGroupA GUID}': {'id': '{StateGroupA GUID}'\n
-                                                     'path': '\\States\\Default WorkUnit\\StGroup_A'},\n
-                '{StateGroupB GUID}': {'id': '{StateGroupB GUID}',\n
-                                                     'path': '\\States\\Default WorkUnit\\StGroup_B'}}
-        """
-        stategrouplist = self.call("ak.wwise.core.object.get", {
-            "from": {
-                "ofType": ["StateGroup"]},
-            "options": {
-                "return": ["id", "path"]}
-        }).get('return', [])
-        ret = {}
-        for stategroup in stategrouplist:
-            ret[stategroup['id']] = {
-                'id': stategroup['id'],
-                'path': stategroup['path']}
-        return ret
-
-    def __get_current_state(self) -> dict:
-        """
-        Return current State in Wwise as dict.
-                ex.) {'id': '{00000000-1111-2222-3333-444444444444}',
-                'name': 'StateA',
-                'parent.id': 
-                'parent.path': '\\States\\Default Work Unit\\StateGroup'}
-        """
-        ret = {}
-        stategroup_dict = self.__get_stategroup_info()
-        for stategroup in stategroup_dict.values():
-            ret.setdefault(stategroup['id'], self.call("ak.soundengine.getState", {
-                "stateGroup": stategroup['id'],
-                "options": {
-                    "return": ["id", "name", "parent.path"]}
-            }).get('return', {}))
-        return ret
+        return WaapiClient_StateUtility.state_in_wwise
 
     def set_state(self, stategroup: str, state: str) -> bool:
         """Return StateGroup information as dict.\n
@@ -149,11 +115,9 @@ class WaapiClient_StateTool(WaapiClient):
         bool: True for success, False otherwise.
         """
         try:
-
             self.call("ak.soundengine.setState", {
                 "stateGroup": stategroup,
-                "state": state
-            })
+                "state": state})
             return True
         except:
             return False
@@ -162,55 +126,60 @@ class WaapiClient_StateTool(WaapiClient):
     # Signature (*args, **kwargs) matches anything, with results being in kwargs.
     def set_subscription(self):
         self.subscribe("ak.wwise.core.object.nameChanged",
-                       self.subscribe_statename_changed, {"return": ["type"]})
+                       self.on_statename_changed, {"return": ["type", "id", "name", "path", "parent"]})
         self.subscribe("ak.wwise.core.profiler.stateChanged",
-                       self.subscribe_state_changed, {"return": ["id", "name"]})
+                       self.on_state_changed, {"return": ["id", "name", "path"]})
 
-    def subscribe_statename_changed(self, *args, **kwargs):
-        if kwargs.get("object", {}).get("type") != "State" and kwargs.get("object", {}).get("type") != "StateGroup":
+    def on_statename_changed(self, **kwargs):
+        # Process for StateGroup
+        if kwargs.get("object", {}).get("type", "") == "StateGroup":
+            WaapiClient_StateUtility.state_in_wwise[kwargs.get("object", {}).get(
+                "id", "")]['path'] = kwargs.get("object", {}).get("path", "")
+        # Process for State
+        elif kwargs.get("object", {}).get("type", "") == "State":
+            WaapiClient_StateUtility.state_in_wwise[kwargs.get(
+                "object", {}).get("parent", {}).get("id", "")]['state'][WaapiClient_StateUtility.state_in_wwise[kwargs.get(
+                    "object", {}).get("parent", {}).get("id", "")]['state'].index(kwargs.get("oldName"))] = kwargs.get("newName")
+        # Except for State/StateGroup
+        else:
             return
-        print(kwargs.get("oldName")+" to "+kwargs.get("newName"))
 
-    def subscribe_state_changed(self, *args, **kwargs):
-        print("!!! State Changed !!!")
-        pprint(args)
-        pprint(kwargs)
+    def on_state_changed(self, *args, **kwargs):
+        WaapiClient_StateUtility.state_in_wwise[kwargs.get(
+            "stateGroup", {}).get("id", "")]['current'] = kwargs.get("state", {}).get("name", "")
 
 
 if __name__ == "__main__":
     try:
         # Connecting to Waapi using default URL
-        client = WaapiClient_StateTool()
+        client = WaapiClient_StateUtility()
         # NOTE: the client must be manually disconnected when instantiated in the global scope
 
     except CannotConnectToWaapiException:
         print("Could not connect to Waapi: Check Wwise is running and WAAPI is enabled.")
     else:
         # Get Selected Object.
-        print("*** Get Selected Object.")
-        pprint(client.call("ak.wwise.ui.getSelectedObjects",
-                           options={
-                               "return": ["id", "name", "type", "shortId", "classId", "category", "filePath",
-                                          "workunit", "parent", "owner", "path", "workunitIsDefault", "workunitType", "workunitIsDirty",
-                                          "childrenCount"]}))
+        # print("*** Get Selected Object.")
+        # pprint(client.call("ak.wwise.ui.getSelectedObjects",
+        #                    options={
+        #                        "return": ["id", "name", "type", "shortId", "classId", "category", "filePath",
+        #                                   "workunit", "parent", "owner", "path", "workunitIsDefault", "workunitType", "workunitIsDirty",
+        #                                   "childrenCount"]}))
 
         # Get ProjectName and Path.
-        print("*** ProjectName and Path: get_wproj_info()")
-        print(client.get_wproj_info())
+        # print("*** ProjectName and Path: get_wproj_info()")
+        # print(client.update_wproj_info())
 
         # Get State List
-        print("*** Get State Dict: update_state_info()")
-        pprint(client.update_state_info())
+        # print("*** Get State Dict: update_state_info()")
+        # pprint(client.update_state_info())
 
-        client.set_state("{5ABE43F7-5E44-4F37-AE07-BC265DDCC34E}",
-                         "{CD350719-7205-45AC-B57A-2FB2E1E492AD}")
-
-        print("*** Get Current State: __get_current_state()")
-        pprint(client.__get_current_state())
+        # client.set_state("{5ABE43F7-5E44-4F37-AE07-BC265DDCC34E}",
+        #                  "{CD350719-7205-45AC-B57A-2FB2E1E492AD}")
 
         # print("*** Subscribe")
         # handler = client.set_subscription()
 
-        client.disconnect()
+        # client.disconnect()
 
         print("*** EOF")

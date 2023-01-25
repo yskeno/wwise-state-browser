@@ -4,7 +4,7 @@ import tkinter.ttk as ttk
 
 
 class MainWindow(tkinter.Tk):
-    def __init__(self, enableautosync=True, visibleonlyname=True):
+    def __init__(self, enableautosync=True, visible_stategroup_path=False):
         super().__init__()
 
         self.title("State Browser Tool")
@@ -13,8 +13,9 @@ class MainWindow(tkinter.Tk):
         self.minsize(750, 220)
 
         # Variables.
-        self.enableautosync = tkinter.BooleanVar(value=enableautosync)
-        self.visibleonlyname = tkinter.BooleanVar(value=visibleonlyname)
+        self.enable_autosync = tkinter.BooleanVar(value=enableautosync)
+        self.visible_stategroup_path = tkinter.BooleanVar(
+            value=visible_stategroup_path)
 
         self._lbltxt_wproj_info = tkinter.StringVar()
         self._btntxt_connectwaapi = tkinter.StringVar()
@@ -46,17 +47,17 @@ class MainWindow(tkinter.Tk):
         self.btn_setstate.grid(column=1, row=0, padx=3, pady=0)
 
         self.chk_autosync = ttk.Checkbutton(self.frame_settings,
-                                            text="Auto Sync StateBrowser with Wwise",
+                                            text="Auto Sync with Wwise",
                                             padding=3,
-                                            variable=self.enableautosync,
+                                            variable=self.enable_autosync,
                                             )
         self.chk_autosync.grid(column=2, row=0, padx=3, pady=0)
 
         self.chk_visibleonlyname = ttk.Checkbutton(self.frame_settings,
-                                                   text="Visible Only StateGroup Name",
+                                                   text="Show StateGroup Path",
                                                    padding=3,
-                                                   variable=self.visibleonlyname,
-                                                   command=self.__on_toggle_visibleonlyname)
+                                                   variable=self.visible_stategroup_path,
+                                                   command=self.__on_toggle_stategrouplabel_text)
         self.chk_visibleonlyname.grid(column=3, row=0, padx=3, pady=0)
 
         # Design Status Frame.
@@ -88,7 +89,7 @@ class MainWindow(tkinter.Tk):
                                               text="StateGroup", width=25, anchor="center")
         self.lbl_title_stategroup.grid(column=0, row=0, sticky="EW")
         self.lbl_title_statename = ttk.Label(self.frame_statebrowser,
-                                             text="State", width=50, anchor="center")
+                                             text="State", width=25, anchor="center")
         self.lbl_title_statename.grid(column=1, row=0, sticky="EW")
 
         self.update_wproj_info()
@@ -121,7 +122,7 @@ class MainWindow(tkinter.Tk):
 
     def update_statebrowser(self):
         self.clear_statebrowser()
-        # Create StateGroupName Label.
+        # Create StateGroupName Label & DirtyFlag Label.
         for stategroup_id, stategroup_info in self.dict_state_in_wwise.items():
             self.dict_statebrowser_object.setdefault(
                 stategroup_id, {}).setdefault(
@@ -129,6 +130,11 @@ class MainWindow(tkinter.Tk):
                                        name="lbl_"+stategroup_id,
                                        #    text=stategroup_info.get('path', ""),
                                        width=50, border=1, relief="solid"))
+            self.dict_statebrowser_object[stategroup_id].setdefault(
+                'Dirty', ttk.Label(self.frame_statebrowser,
+                                   name="dirty_"+stategroup_id,
+                                   foreground="red",
+                                   width=5, border=1, relief="flat"))
 
             # Create State ComboBox.
             combobox_values = []
@@ -139,8 +145,8 @@ class MainWindow(tkinter.Tk):
                 'ComboBox', ttk.Combobox(self.frame_statebrowser,
                                          name=stategroup_id,
                                          state='readonly',
-                                         width=50,
-                                         values=combobox_values,))
+                                         width=25,
+                                         values=combobox_values))
             self.dict_statebrowser_object[stategroup_id]['ComboBox'].current(0)
             self.dict_statebrowser_object[stategroup_id]['ComboBox'].bind(
                 '<<ComboboxSelected>>', self.__on_state_combobox_changed)
@@ -151,23 +157,25 @@ class MainWindow(tkinter.Tk):
                     column=0, row=i+1, sticky="EW")
                 self.dict_statebrowser_object[stategroup_id]['ComboBox'].grid(
                     column=1, row=i+1, sticky="EW")
+                self.dict_statebrowser_object[stategroup_id]['Dirty'].grid(
+                    column=2, row=i+1)
 
             # Set ComboBox value to current State.
             self.dict_statebrowser_object[stategroup_id]['ComboBox'].set(
                 stategroup_info.get('current'))
 
         # Set Label text.
-        self.__on_toggle_visibleonlyname()
+        self.__on_toggle_stategrouplabel_text()
 
-    def __on_toggle_visibleonlyname(self):
-        if self.visibleonlyname.get() == True:
-            for stategroup in self.dict_statebrowser_object.keys():
-                self.dict_statebrowser_object[stategroup]['Label'].config(
-                    text=self.dict_state_in_wwise.get(stategroup, {}).get('path', "").split('\\')[-1])
-        else:
+    def __on_toggle_stategrouplabel_text(self):
+        if self.visible_stategroup_path.get() == True:
             for stategroup in self.dict_statebrowser_object.keys():
                 self.dict_statebrowser_object[stategroup]['Label'].config(
                     text=self.dict_state_in_wwise.get(stategroup, {}).get('path', ""))
+        else:
+            for stategroup in self.dict_statebrowser_object.keys():
+                self.dict_statebrowser_object[stategroup]['Label'].config(
+                    text=self.dict_state_in_wwise.get(stategroup, {}).get('path', "").split('\\')[-1])
 
     def __on_state_combobox_changed(self, event):
         # Already listed in dict_changedstate?

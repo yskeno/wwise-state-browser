@@ -122,7 +122,7 @@ class WaapiClient_StateUtility(WaapiClient):
         except:
             return False
 
-    # Callback function with F matching signature.
+    # Callback function with a matching signature.
     # Signature (*args, **kwargs) matches anything, with results being in kwargs.
     def set_subscription(self):
         self.subscribe("ak.wwise.core.object.nameChanged",

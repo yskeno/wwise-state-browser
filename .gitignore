@@ -129,4 +129,4 @@ dmypy.json
 .pyre/
 
 # [USER]
-WwiseBrowserTool.ini
+WwiseStateBrowser.ini

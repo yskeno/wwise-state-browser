@@ -65,29 +65,33 @@ def sync_state_browser(rootwd: TK_Window.MainWindow, client: WAAPI_StateUtility.
     pass
 
 
-def close_main_window(rootwd: TK_Window.MainWindow, client: WAAPI_StateUtility.WaapiClient_StateUtility):
+def close_main_window(rootwd: TK_Window.MainWindow, client: WAAPI_StateUtility.WaapiClient_StateUtility = None):
     if isinstance(client, WAAPI_StateUtility.WaapiClient_StateUtility):
         client.disconnect()
         client = None
-    with open('WwiseBrowserTool.ini', 'w') as ini:
-        config['SETTINGS'] = {'enableautosync': rootwd.enableautosync.get(),
-                              'visibleonlyname': rootwd.visibleonlyname.get()}
+    with open('WwiseStateBrowser.ini', 'w') as ini:
+        config['SETTINGS'] = {'enable_autosync': rootwd.enable_autosync.get(),
+                              'visible_stategroup_path': rootwd.visible_stategroup_path.get()}
         config.write(ini)
     rootwd.destroy()
 
 
 config = configparser.ConfigParser()
-if not os.path.exists(os.getcwd()+"\\WwiseBrowserTool.ini"):
-    with open('WwiseBrowserTool.ini', 'w') as ini:
-        config['DEFAULT'] = {'enableautosync': True,
-                             'visibleonlyname': True}
+if not os.path.exists(os.getcwd()+"\\WwiseStateBrowser.ini"):
+    with open('WwiseStateBrowser.ini', 'w') as ini:
+        config['DEFAULT'] = {'enable_autosync': True,
+                             'visible_stategroup_path': False}
         config['SETTINGS'] = {'enableautosync': True,
-                              'visibleonlyname': True}
+                              'visible_stategroup_path': False}
         config.write(ini)
-config.read('WwiseBrowserTool.ini')
+config.read('WwiseStateBrowser.ini')
+
 
 rootwd = TK_Window.MainWindow(
-    config['SETTINGS']['enableautosync'], config['SETTINGS']['visibleonlyname'])
+    config['SETTINGS']['enable_autosync'], config['SETTINGS']['visible_stategroup_path'])
+rootwd.protocol("WM_DELETE_WINDOW",
+                lambda: close_main_window(rootwd))
+
 rootwd.btn_connectwaapi['command'] = lambda: connect_to_wwise(rootwd)
 
 client = connect_to_wwise(rootwd)

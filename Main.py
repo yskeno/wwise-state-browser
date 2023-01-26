@@ -2,7 +2,7 @@
 import os
 import configparser
 
-import WAAPI_StateUtility
+import WaapiInterface
 import TK_Window
 
 
@@ -11,9 +11,8 @@ def connect_to_wwise(rootwd: TK_Window.MainWindow):
     try:
         # Connecting to Waapi using default URL
         # NOTE: the client must be manually disconnected when instantiated in the global scope
-        client = WAAPI_StateUtility.WaapiClient_StateUtility()
+        client = WaapiInterface.StateUtility()
 
-        rootwd.dict_wproj_info = client.wproj_info
         rootwd.dict_state_in_wwise = client.state_in_wwise
 
         global handler
@@ -21,52 +20,44 @@ def connect_to_wwise(rootwd: TK_Window.MainWindow):
             "ak.wwise.core.project.preClosed", lambda: disconnect_from_wwise(rootwd, client))
         rootwd.protocol("WM_DELETE_WINDOW",
                         lambda: close_main_window(rootwd, client))
-        rootwd.update_wproj_info(True)
-        update_state_browsertool(rootwd)
+        rootwd.update_wproj_info(client.wproj_info)
+        rootwd.update_statebrowser()
         bind_tkinter_to_waapi(rootwd, client)
 
         return client
-    except WAAPI_StateUtility.CannotConnectToWaapiException:
+    except WaapiInterface.CannotConnectToWaapiException:
         rootwd.update_wproj_info(False)
         return
 
 
-def disconnect_from_wwise(rootwd: TK_Window.MainWindow, client: WAAPI_StateUtility.WaapiClient_StateUtility):
+def disconnect_from_wwise(rootwd: TK_Window.MainWindow, client: WaapiInterface.StateUtility):
     client.unsubscribe(handler)
     client.disconnect()
     rootwd.btn_connectwaapi['command'] = lambda: connect_to_wwise(rootwd)
-    rootwd.btn_updatestate['command'] = None
     rootwd.btn_setstate['command'] = None
     rootwd.update_wproj_info()
 
 
-def bind_tkinter_to_waapi(rootwd: TK_Window.MainWindow, client: WAAPI_StateUtility.WaapiClient_StateUtility):
+def bind_tkinter_to_waapi(rootwd: TK_Window.MainWindow, client: WaapiInterface.StateUtility):
     rootwd.btn_connectwaapi['command'] = lambda: disconnect_from_wwise(
         rootwd, client)
-    rootwd.btn_updatestate['command'] = lambda: update_state_browsertool(
-        rootwd)
     rootwd.btn_setstate['command'] = lambda: set_changed_state(
         rootwd, client)
 
 
-def update_state_browsertool(rootwd: TK_Window.MainWindow):
-    rootwd.update_statebrowser()
-    return
-
-
-def set_changed_state(rootwd: TK_Window.MainWindow, client: WAAPI_StateUtility.WaapiClient_StateUtility):
+def set_changed_state(rootwd: TK_Window.MainWindow, client: WaapiInterface.StateUtility):
     for stategroup_id, state_name in rootwd.dict_changedstate.items():
         client.set_state(stategroup_id, state_name)
     rootwd.dict_changedstate = {}
 
 
-def sync_state_browser(rootwd: TK_Window.MainWindow, client: WAAPI_StateUtility.WaapiClient_StateUtility):
+def sync_state_browser(rootwd: TK_Window.MainWindow, client: WaapiInterface.StateUtility):
     # TODO:Add Function.
     pass
 
 
-def close_main_window(rootwd: TK_Window.MainWindow, client: WAAPI_StateUtility.WaapiClient_StateUtility = None):
-    if isinstance(client, WAAPI_StateUtility.WaapiClient_StateUtility):
+def close_main_window(rootwd: TK_Window.MainWindow, client: WaapiInterface.StateUtility = None):
+    if isinstance(client, WaapiInterface.StateUtility):
         client.disconnect()
         client = None
     with open('WwiseStateBrowser.ini', 'w') as ini:

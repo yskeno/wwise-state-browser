@@ -2,13 +2,24 @@
 from waapi import WaapiClient, CannotConnectToWaapiException
 from pprint import pprint
 
+from StateObserver import Subject
 
-class WaapiClient_StateUtility(WaapiClient):
+
+class StateUtility(WaapiClient, Subject):
     # {'StateGroup GUID': {'path': 'StateGroup Name',
     #                       'state': ['State Name', 'State Name', ...],
     #                       'current': 'State name'}
-    wproj_info = {}
-    state_in_wwise = {}
+    __wproj_info = {}
+
+    @property
+    def wproj_info(self):
+        return StateUtility.__wproj_info
+
+    __state_in_wwise = {}
+
+    @property
+    def state_in_wwise(self):
+        return StateUtility.__state_in_wwise
 
     # for Singleton design pattern.
     __instance = None
@@ -48,10 +59,10 @@ class WaapiClient_StateUtility(WaapiClient):
             "options": {
                 "return": ["name", "filePath"]}})
 
-        WaapiClient_StateUtility.wproj_info = {'name': wproj_object['return'][0]['name'],
-                                               'filePath': wproj_object['return'][0]['filePath']}
+        StateUtility.__wproj_info = {'name': wproj_object['return'][0]['name'],
+                                     'filePath': wproj_object['return'][0]['filePath']}
 
-        return WaapiClient_StateUtility.wproj_info
+        return StateUtility.__wproj_info
 
     def update_state_info(self) -> dict:
         """Return State information.\n
@@ -102,9 +113,9 @@ class WaapiClient_StateUtility(WaapiClient):
 
         # Sort return dict by path.
         for k, v in sorted(ret.items(), key=lambda x: x[1]['path']):
-            WaapiClient_StateUtility.state_in_wwise[k] = v
+            StateUtility.__state_in_wwise[k] = v
 
-        return WaapiClient_StateUtility.state_in_wwise
+        return StateUtility.__state_in_wwise
 
     def set_state(self, stategroup: str, state: str) -> bool:
         """Return StateGroup information as dict.\n
@@ -133,26 +144,26 @@ class WaapiClient_StateUtility(WaapiClient):
     def on_statename_changed(self, **kwargs):
         # Process for StateGroup
         if kwargs.get("object", {}).get("type", "") == "StateGroup":
-            WaapiClient_StateUtility.state_in_wwise[kwargs.get("object", {}).get(
+            StateUtility.__state_in_wwise[kwargs.get("object", {}).get(
                 "id", "")]['path'] = kwargs.get("object", {}).get("path", "")
         # Process for State
         elif kwargs.get("object", {}).get("type", "") == "State":
-            WaapiClient_StateUtility.state_in_wwise[kwargs.get(
-                "object", {}).get("parent", {}).get("id", "")]['state'][WaapiClient_StateUtility.state_in_wwise[kwargs.get(
+            StateUtility.__state_in_wwise[kwargs.get(
+                "object", {}).get("parent", {}).get("id", "")]['state'][StateUtility.__state_in_wwise[kwargs.get(
                     "object", {}).get("parent", {}).get("id", "")]['state'].index(kwargs.get("oldName"))] = kwargs.get("newName")
         # Except for State/StateGroup
         else:
             return
 
     def on_state_changed(self, *args, **kwargs):
-        WaapiClient_StateUtility.state_in_wwise[kwargs.get(
+        StateUtility.__state_in_wwise[kwargs.get(
             "stateGroup", {}).get("id", "")]['current'] = kwargs.get("state", {}).get("name", "")
 
 
 if __name__ == "__main__":
     try:
         # Connecting to Waapi using default URL
-        client = WaapiClient_StateUtility()
+        client = StateUtility()
         # NOTE: the client must be manually disconnected when instantiated in the global scope
 
     except CannotConnectToWaapiException:

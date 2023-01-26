@@ -2,8 +2,10 @@
 import tkinter
 import tkinter.ttk as ttk
 
+from StateObserver import Observer
 
-class MainWindow(tkinter.Tk):
+
+class MainWindow(tkinter.Tk, Observer):
     def __init__(self, enableautosync=True, visible_stategroup_path=False):
         super().__init__()
 
@@ -17,10 +19,6 @@ class MainWindow(tkinter.Tk):
         self.visible_stategroup_path = tkinter.BooleanVar(
             value=visible_stategroup_path)
 
-        self._lbltxt_wproj_info = tkinter.StringVar()
-        self._btntxt_connectwaapi = tkinter.StringVar()
-
-        self.dict_wproj_info = {}
         self.dict_state_in_wwise = {}
         # { 'StateGroup' : {'Label' : LabelObject<StateGroupName>,
         #                   'ComboBox' : ComboBoxObject<StateName> }
@@ -28,18 +26,19 @@ class MainWindow(tkinter.Tk):
         # { 'StateGroup GUID' : 'State Name' }
         self.dict_changedstate = {}
 
-        # Design Settings Frame.
+        # Create Settings Section.
         self.frame_settings = ttk.Labelframe(self,
                                              text="Settings",
                                              padding=3, border=1, relief="solid")
         self.frame_settings.grid(column=0, row=0, sticky="nw",
                                  padx=10, pady=3, ipadx=2, ipady=0)
 
-        self.btn_updatestate = ttk.Button(self.frame_settings,
+        self.btn_forceupdate = ttk.Button(self.frame_settings,
                                           text="Force Update",
+                                          command=self.update_statebrowser,
                                           state='disabled',
                                           padding=3,)
-        self.btn_updatestate.grid(column=0, row=0, padx=3, pady=0)
+        self.btn_forceupdate.grid(column=0, row=0, padx=3, pady=0)
 
         self.btn_setstate = ttk.Button(self.frame_settings,
                                        text="Set State", padding=3,
@@ -60,7 +59,7 @@ class MainWindow(tkinter.Tk):
                                                    command=self.__on_toggle_stategrouplabel_text)
         self.chk_visibleonlyname.grid(column=3, row=0, padx=3, pady=0)
 
-        # Design Status Frame.
+        # Create Status Section.
         self.frame_status = ttk.Labelframe(self,
                                            text="Connection Status",
                                            padding=3, border=1, relief="solid")
@@ -68,17 +67,17 @@ class MainWindow(tkinter.Tk):
                                padx=5, pady=3, ipadx=2, ipady=0,)
 
         self.btn_connectwaapi = ttk.Button(self.frame_status,
-                                           textvariable=self._btntxt_connectwaapi,
+                                           text="",
                                            state='active',
                                            padding=3, width=10)
         self.btn_connectwaapi.pack(side="left")
 
         self.lbl_wproj_info = ttk.Label(self.frame_status,
-                                        textvariable=self._lbltxt_wproj_info,
+                                        text="",
                                         padding=3)
         self.lbl_wproj_info.pack(side="left")
 
-        # Design State Browser.
+        # Create StateBrowser Section.
         self.frame_statebrowser = ttk.Labelframe(self,
                                                  text="State List",
                                                  padding=3, border=1, relief="solid")
@@ -95,22 +94,22 @@ class MainWindow(tkinter.Tk):
         self.update_wproj_info()
 
     def show_connecting_message(self):
-        self._lbltxt_wproj_info.set("Connecting to Wwise...")
+        self.lbl_wproj_info.config(text="Connecting to Wwise...")
         self.lbl_wproj_info.update()
 
-    def update_wproj_info(self, isconnected=False):
-        if isconnected == True:
-            self._lbltxt_wproj_info.set(
-                "Connected: " + self.dict_wproj_info.get('name', "") + "<"+self.dict_wproj_info.get('filePath', "") + ">")
-            self._btntxt_connectwaapi.set("Disconnect")
+    def update_wproj_info(self, wproj_info: dict = {}):
+        if any(wproj_info):
+            self.lbl_wproj_info.config(
+                text="Connected: " + wproj_info.get('name', "") + "<"+wproj_info.get('filePath', "") + ">")
+            self.btn_connectwaapi.config(text="Disconnect")
             self.btn_connectwaapi['state'] = 'normal'
-            self.btn_updatestate['state'] = 'normal'
+            self.btn_forceupdate['state'] = 'normal'
             self.btn_setstate['state'] = 'normal'
         else:
-            self._lbltxt_wproj_info.set(
-                "NotConnected: Check Wwise is running and WAAPI is enabled.")
-            self._btntxt_connectwaapi.set("Connect")
-            self.btn_updatestate['state'] = 'disabled'
+            self.lbl_wproj_info.config(
+                text="NotConnected: Check Wwise is running and WAAPI is enabled.")
+            self.btn_connectwaapi.config(text="Connect")
+            self.btn_forceupdate['state'] = 'disabled'
             self.btn_setstate['state'] = 'disabled'
 
     def clear_statebrowser(self):

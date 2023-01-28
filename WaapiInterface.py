@@ -1,5 +1,6 @@
 #! python3
 from waapi import WaapiClient, CannotConnectToWaapiException
+from waapi.client.executor import SequentialThreadExecutor
 from pprint import pprint
 
 from StateObserver import Subject
@@ -21,21 +22,22 @@ class StateUtility(WaapiClient, Subject):
     def state_in_wwise(self):
         return StateUtility.__state_in_wwise
 
-    # for Singleton design pattern.
-    __instance = None
+    def __init__(self,
+                 url=None,
+                 allow_exception=False,
+                 callback_executor=SequentialThreadExecutor,
+                 observer=None):
+        super().__init__(url, allow_exception, callback_executor)
+        if observer is not None:
+            self.add_observer(observer)
 
-    def __new__(cls):
-        if cls.__instance is None:
-            cls.__instance = super().__new__(cls)
-        return cls.__instance
+        # { 'StateGroup GUID' : {'StateGroup':{'newName':NewStateGroup Path},
+        #                        'State': {'id':State GUID,
+        #                                  'oldName':OldState Name,
+        #                                  'newName':NewState Name}}
+        self.changed_statename = {}
+        self.changed_currentstate = {}   # { StateGroup GUID : NewState Name}
 
-    def __call__(cls):
-        if cls.__instance is None:
-            cls.__instance = super().__call__(cls)
-        return cls.__instance
-
-    def __init__(self):
-        super().__init__()
         self.update_wproj_info()
         self.update_state_info()
         self.set_subscription()
@@ -45,6 +47,21 @@ class StateUtility(WaapiClient, Subject):
             return False
         else:
             return super().is_connected()
+
+    def disconnect(self) -> bool:
+        ret = super().disconnect()
+        self.notify_observer_of_waapi_disconnected()
+        return ret
+
+    # Callback function with a matching signature.
+    # Signature (*args, **kwargs) matches anything, with results being in kwargs.
+    def set_subscription(self):
+        self.subscribe("ak.wwise.core.project.preClosed",
+                       self.disconnect)
+        self.subscribe("ak.wwise.core.object.nameChanged",
+                       self.on_statename_changed, {"return": ["type", "id", "name", "path", "parent"]})
+        self.subscribe("ak.wwise.core.profiler.stateChanged",
+                       self.on_currentstate_changed, {"return": ["id", "name", "path"]})
 
     def update_wproj_info(self) -> dict:
         """
@@ -133,31 +150,56 @@ class StateUtility(WaapiClient, Subject):
         except:
             return False
 
-    # Callback function with a matching signature.
-    # Signature (*args, **kwargs) matches anything, with results being in kwargs.
-    def set_subscription(self):
-        self.subscribe("ak.wwise.core.object.nameChanged",
-                       self.on_statename_changed, {"return": ["type", "id", "name", "path", "parent"]})
-        self.subscribe("ak.wwise.core.profiler.stateChanged",
-                       self.on_state_changed, {"return": ["id", "name", "path"]})
-
     def on_statename_changed(self, **kwargs):
-        # Process for StateGroup
+        # Process for StateGroup.
         if kwargs.get("object", {}).get("type", "") == "StateGroup":
-            StateUtility.__state_in_wwise[kwargs.get("object", {}).get(
-                "id", "")]['path'] = kwargs.get("object", {}).get("path", "")
-        # Process for State
+            stategroupguid = kwargs.get("object", {}).get("id", "")
+            self.changed_statename[stategroupguid] = {"StateGroup":
+                                                      {'oldName': StateUtility.__state_in_wwise[stategroupguid]['path'],
+                                                       'newName': kwargs.get("object", {}).get("path", "")}}
+            StateUtility.__state_in_wwise[stategroupguid]['path'] = kwargs.get(
+                "object", {}).get("path", "")
+            self.notify_observer_of_statename_changed()
+
+        # Process for State.
         elif kwargs.get("object", {}).get("type", "") == "State":
-            StateUtility.__state_in_wwise[kwargs.get(
-                "object", {}).get("parent", {}).get("id", "")]['state'][StateUtility.__state_in_wwise[kwargs.get(
-                    "object", {}).get("parent", {}).get("id", "")]['state'].index(kwargs.get("oldName"))] = kwargs.get("newName")
-        # Except for State/StateGroup
+            stategroupguid = kwargs.get("object", {}).get(
+                "parent", {}).get("id", "")
+            # Make new Changed State List.
+            if not self.changed_statename.get(stategroupguid, {}).get("State", []):
+                self.changed_statename[stategroupguid] = {"State": []}
+
+            # Is Changed State already exist in changed_statename?
+            if kwargs.get("object", {}).get("id", "") in [k['id'] for k in self.changed_statename[stategroupguid]['State']]:
+                existed_id = [k['id']
+                              for k in self.changed_statename[stategroupguid]['State']].index(kwargs.get("object", {}).get("id", ""))
+                self.changed_statename[stategroupguid]["State"][existed_id] = {'id': kwargs.get("object", {}).get("id", ""),
+                                                                               'oldName': kwargs.get("oldName", ""),
+                                                                               'newName': kwargs.get("newName", "")}
+            else:
+                self.changed_statename[stategroupguid]["State"].append({'id': kwargs.get("object", {}).get("id", ""),
+                                                                        'oldName': kwargs.get("oldName", ""),
+                                                                        'newName': kwargs.get("newName", "")})
+            StateUtility.__state_in_wwise[stategroupguid]['state'][StateUtility.__state_in_wwise[stategroupguid]['state'].index(
+                kwargs.get("oldName"))] = kwargs.get("newName")
+            self.notify_observer_of_statename_changed()
+
+        # Except for State/StateGroup.
         else:
             return
 
-    def on_state_changed(self, *args, **kwargs):
+    def on_currentstate_changed(self, *args, **kwargs):
         StateUtility.__state_in_wwise[kwargs.get(
             "stateGroup", {}).get("id", "")]['current'] = kwargs.get("state", {}).get("name", "")
+        self.changed_currentstate[kwargs.get(
+            "stateGroup", {}).get("id", "")] = kwargs.get("state", {}).get("name", "")
+        self.notify_observer_of_currentstate_changed()
+
+    def on_statename_sync_completed(self):
+        self.changed_statename = {}
+
+    def on_currentstate_sync_completed(self):
+        self.changed_currentstate = {}
 
 
 if __name__ == "__main__":

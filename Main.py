@@ -12,6 +12,8 @@ def connect_to_wwise(rootwd: TK_Window.MainWindow):
         # Connecting to Waapi using default URL
         # NOTE: the client must be manually disconnected when instantiated in the global scope
         client = WaapiInterface.StateUtility()
+        client.add_observer(rootwd)
+        rootwd.client = client
 
         rootwd.dict_state_in_wwise = client.state_in_wwise
 
@@ -25,14 +27,13 @@ def connect_to_wwise(rootwd: TK_Window.MainWindow):
         bind_tkinter_to_waapi(rootwd, client)
 
         return client
+
     except WaapiInterface.CannotConnectToWaapiException:
-        rootwd.update_wproj_info(False)
+        rootwd.update_wproj_info()
         return
 
 
 def disconnect_from_wwise(rootwd: TK_Window.MainWindow, client: WaapiInterface.StateUtility):
-    client.unsubscribe(handler)
-    client.disconnect()
     rootwd.btn_connectwaapi['command'] = lambda: connect_to_wwise(rootwd)
     rootwd.btn_setstate['command'] = None
     rootwd.update_wproj_info()
@@ -41,25 +42,11 @@ def disconnect_from_wwise(rootwd: TK_Window.MainWindow, client: WaapiInterface.S
 def bind_tkinter_to_waapi(rootwd: TK_Window.MainWindow, client: WaapiInterface.StateUtility):
     rootwd.btn_connectwaapi['command'] = lambda: disconnect_from_wwise(
         rootwd, client)
-    rootwd.btn_setstate['command'] = lambda: set_changed_state(
-        rootwd, client)
-
-
-def set_changed_state(rootwd: TK_Window.MainWindow, client: WaapiInterface.StateUtility):
-    for stategroup_id, state_name in rootwd.dict_changedstate.items():
-        client.set_state(stategroup_id, state_name)
-    rootwd.dict_changedstate = {}
-
-
-def sync_state_browser(rootwd: TK_Window.MainWindow, client: WaapiInterface.StateUtility):
-    # TODO:Add Function.
-    pass
 
 
 def close_main_window(rootwd: TK_Window.MainWindow, client: WaapiInterface.StateUtility = None):
     if isinstance(client, WaapiInterface.StateUtility):
         client.disconnect()
-        client = None
     with open('WwiseStateBrowser.ini', 'w') as ini:
         config['SETTINGS'] = {'enable_autosync': rootwd.enable_autosync.get(),
                               'visible_stategroup_path': rootwd.visible_stategroup_path.get()}

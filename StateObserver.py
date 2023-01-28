@@ -13,6 +13,10 @@ class Subject:
     def remove_observer(self, observer):
         self.__observers.remove(observer)
 
+    def notify_observer_of_wproj_postclosed(self):
+        for observer in self.__observers:
+            observer.on_wproj_postclosed(self)
+
     def notify_observer_of_waapi_disconnected(self):
         for observer in self.__observers:
             observer.on_waapi_disconnected(self)

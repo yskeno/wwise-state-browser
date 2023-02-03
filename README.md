@@ -1,4 +1,4 @@
 # WwiseBrowserTool
 ## Requirements
 ## Setup
-### Usage
+## Usage

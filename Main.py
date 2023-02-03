@@ -54,6 +54,7 @@ def close_main_window(rootwd: TK_Window.MainWindow, client: WaapiInterface.State
     rootwd.destroy()
 
 
+# Config File.
 config = configparser.ConfigParser()
 if not os.path.exists(os.getcwd()+"\\WwiseStateBrowser.ini"):
     with open('WwiseStateBrowser.ini', 'w') as ini:

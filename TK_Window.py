@@ -10,7 +10,7 @@ class MainWindow(tkinter.Tk, Observer):
     def __init__(self, enableautosync=True, visible_stategroup_path=False):
         super().__init__()
 
-        self.title("State Browser Tool")
+        self.title("WAAPI State Browser")
         self.columnconfigure(0, weight=2)
         self.columnconfigure(1, weight=3)
         self.minsize(750, 220)
@@ -78,7 +78,7 @@ class MainWindow(tkinter.Tk, Observer):
 
         self.btn_connectwaapi = ttk.Button(self.frame_status,
                                            name="btn_connectwaapi",
-                                           text="",
+                                           text="Wait",
                                            state='active',
                                            padding=3, width=10)
         self.btn_connectwaapi.pack(side="left")
@@ -90,17 +90,16 @@ class MainWindow(tkinter.Tk, Observer):
         self.lbl_wproj_info.pack(side="left")
         # Create Log Section.
         self.frame_log = ttk.Labelframe(self,
-                                           name="frame_log",
-                                           text="Log",
-                                           padding=3, border=1, relief="solid")
+                                        name="frame_log",
+                                        text="Log",
+                                        padding=3, border=1, relief="solid")
         self.frame_log.grid(column=0, row=3, sticky="sw",
-                               padx=5, pady=3, ipadx=2, ipady=0,)
+                            padx=5, pady=3, ipadx=2, ipady=0,)
         self.lbl_log = ttk.Label(self.frame_log,
-                                        name="lbl_log",
-                                        text="Welcome to WaapiStateBrowser!",
-                                        padding=3)
+                                 name="lbl_log",
+                                 text="Welcome to WaapiStateBrowser!",
+                                 padding=3)
         self.lbl_log.pack(side="left")
-
 
         # Create StateBrowser Section.
         self.frame_statebrowser = ttk.Labelframe(self, name="frame_statebrowser",
@@ -116,7 +115,7 @@ class MainWindow(tkinter.Tk, Observer):
                                              text="State", width=25, anchor="center")
         self.lbl_title_statename.grid(column=1, row=0, sticky="EW")
 
-        self.update_wproj_info()
+        # self.update_wproj_info()
 
     def show_connecting_message(self):
         self.lbl_wproj_info.config(text="Connecting to Wwise...")
@@ -127,6 +126,7 @@ class MainWindow(tkinter.Tk, Observer):
             self.lbl_wproj_info.config(
                 text="Connected: " + wproj_info.get('name', "") + "<"+wproj_info.get('filePath', "") + ">")
             self.btn_connectwaapi.config(text="Disconnect")
+            self.btn_connectwaapi.config(command=self.client.disconnect)
             self.btn_connectwaapi['state'] = 'normal'
             self.btn_forceupdate['state'] = 'normal'
             self.btn_setstate['state'] = 'normal'

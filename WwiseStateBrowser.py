@@ -2,16 +2,16 @@
 import os
 import configparser
 
-import WaapiInterface
-import TK_Window
+import WwiseStateBrowserInterface
+import WwiseStateBrowserGUI
 
 
-def connect_to_wwise(rootwd: TK_Window.MainWindow):
+def connect_to_wwise(rootwd: WwiseStateBrowserGUI.MainWindow):
     rootwd.show_connecting_message()
     try:
         # Connecting to Waapi using default URL
         # NOTE: the client must be manually disconnected when instantiated in the global scope
-        client = WaapiInterface.StateUtility()
+        client = WwiseStateBrowserInterface.StateUtility()
         client.add_observer(rootwd)
         rootwd.client = client
 
@@ -28,24 +28,24 @@ def connect_to_wwise(rootwd: TK_Window.MainWindow):
 
         return client
 
-    except WaapiInterface.CannotConnectToWaapiException:
+    except WwiseStateBrowserInterface.CannotConnectToWaapiException:
         rootwd.update_wproj_info()
         return
 
 
-def disconnect_from_wwise(rootwd: TK_Window.MainWindow, client: WaapiInterface.StateUtility):
+def disconnect_from_wwise(rootwd: WwiseStateBrowserGUI.MainWindow, client: WwiseStateBrowserInterface.StateUtility):
     rootwd.btn_connectwaapi['command'] = lambda: connect_to_wwise(rootwd)
     rootwd.btn_setstate['command'] = None
     rootwd.update_wproj_info()
 
 
-def bind_tkinter_to_waapi(rootwd: TK_Window.MainWindow, client: WaapiInterface.StateUtility):
+def bind_tkinter_to_waapi(rootwd: WwiseStateBrowserGUI.MainWindow, client: WwiseStateBrowserInterface.StateUtility):
     rootwd.btn_connectwaapi['command'] = lambda: disconnect_from_wwise(
         rootwd, client)
 
 
-def close_main_window(rootwd: TK_Window.MainWindow, client: WaapiInterface.StateUtility = None):
-    if isinstance(client, WaapiInterface.StateUtility):
+def close_main_window(rootwd: WwiseStateBrowserGUI.MainWindow, client: WwiseStateBrowserInterface.StateUtility = None):
+    if isinstance(client, WwiseStateBrowserInterface.StateUtility):
         client.disconnect()
     with open('WwiseStateBrowser.ini', 'w') as ini:
         config['SETTINGS'] = {'enable_autosync': rootwd.enable_autosync.get(),
@@ -66,7 +66,7 @@ if not os.path.exists(os.getcwd()+"\\WwiseStateBrowser.ini"):
 config.read('WwiseStateBrowser.ini')
 
 
-rootwd = TK_Window.MainWindow(
+rootwd = WwiseStateBrowserGUI.MainWindow(
     config['SETTINGS']['enable_autosync'], config['SETTINGS']['visible_stategroup_path'])
 rootwd.protocol("WM_DELETE_WINDOW",
                 lambda: close_main_window(rootwd))

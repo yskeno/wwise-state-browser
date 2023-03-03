@@ -70,11 +70,9 @@ class StateUtility(WaapiClient, Subject):
         'filePath': 'wproj_path'}
         """
 
-        wproj_object = self.call("ak.wwise.core.object.get", {
-            "from": {
-                "ofType": ["Project"]},
-            "options": {
-                "return": ["name", "filePath"]}})
+        wproj_object = self.call("ak.wwise.core.object.get",
+                                 {"from": {"ofType": ["Project"]},
+                                  "options": {"return": ["name", "filePath"]}})
 
         StateUtility.__wproj_info = {'name': wproj_object['return'][0]['name'],
                                      'filePath': wproj_object['return'][0]['filePath']}
@@ -212,12 +210,12 @@ if __name__ == "__main__":
         print("Could not connect to Waapi: Check Wwise is running and WAAPI is enabled.")
     else:
         # Get Selected Object.
-        # print("*** Get Selected Object.")
-        # pprint(client.call("ak.wwise.ui.getSelectedObjects",
-        #                    options={
-        #                        "return": ["id", "name", "type", "shortId", "classId", "category", "filePath",
-        #                                   "workunit", "parent", "owner", "path", "workunitIsDefault", "workunitType", "workunitIsDirty",
-        #                                   "childrenCount"]}))
+        print("*** Get Selected Object.")
+        pprint(client.call("ak.wwise.ui.getSelectedObjects"))
+        #    options={
+        #        "return": ["id", "name", "type", "shortId", "classId", "category", "filePath",
+        #                   "workunit", "parent", "owner", "path", "workunitIsDefault", "workunitType", "workunitIsDirty",
+        #                   "childrenCount"]}))
 
         # Get ProjectName and Path.
         # print("*** ProjectName and Path: get_wproj_info()")
@@ -233,6 +231,6 @@ if __name__ == "__main__":
         # print("*** Subscribe")
         # handler = client.set_subscription()
 
-        # client.disconnect()
+        client.disconnect()
 
         print("*** EOF")

@@ -3,7 +3,7 @@ import tkinter
 import tkinter.ttk as ttk
 
 from StateObserver import Observer
-from WaapiInterface import StateUtility
+from WwiseStateBrowserInterface import StateUtility
 
 
 class MainWindow(tkinter.Tk, Observer):

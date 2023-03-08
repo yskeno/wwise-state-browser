@@ -13,9 +13,9 @@ class Subject:
     def remove_observer(self, observer):
         self.__observers.remove(observer)
 
-    def notify_observer_of_wproj_postclosed(self):
+    def notify_observer_of_waapi_connected(self):
         for observer in self.__observers:
-            observer.on_wproj_postclosed(self)
+            observer.on_waapi_connected(self)
 
     def notify_observer_of_waapi_disconnected(self):
         for observer in self.__observers:
@@ -35,6 +35,9 @@ class Subject:
 
 class Observer:
     def __init__(self):
+        pass
+
+    def on_waapi_connected():
         pass
 
     def on_waapi_disconnected():

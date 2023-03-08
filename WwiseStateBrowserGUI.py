@@ -10,7 +10,7 @@ class MainWindow(tkinter.Tk, Observer):
     def __init__(self, enableautosync=True, visible_stategroup_path=False):
         super().__init__()
 
-        self.title("WAAPI State Browser")
+        self.title("Wwise State Browser")
         self.columnconfigure(0, weight=2)
         self.columnconfigure(1, weight=3)
         self.minsize(750, 220)
@@ -60,13 +60,13 @@ class MainWindow(tkinter.Tk, Observer):
                                             )
         self.chk_autosync.grid(column=2, row=0, padx=3, pady=0)
 
-        self.chk_visibleonlyname = ttk.Checkbutton(self.frame_settings,
-                                                   name="chk_visibleonlyname",
-                                                   text="Show StateGroup Path",
-                                                   padding=3,
-                                                   variable=self.visible_stategroup_path,
-                                                   command=self.__on_toggle_stategrouplabel_text)
-        self.chk_visibleonlyname.grid(column=3, row=0, padx=3, pady=0)
+        self.chk_visiblegrouppath = ttk.Checkbutton(self.frame_settings,
+                                                    name="chk_visiblegrouppath",
+                                                    text="Show StateGroup Path",
+                                                    padding=3,
+                                                    variable=self.visible_stategroup_path,
+                                                    command=self.__on_toggle_stategrouplabel_text)
+        self.chk_visiblegrouppath.grid(column=3, row=0, padx=3, pady=0)
 
         # Create Status Section.
         self.frame_status = ttk.Labelframe(self,
@@ -78,7 +78,7 @@ class MainWindow(tkinter.Tk, Observer):
 
         self.btn_connectwaapi = ttk.Button(self.frame_status,
                                            name="btn_connectwaapi",
-                                           text="Wait",
+                                           text="Connect",
                                            state='active',
                                            padding=3, width=10)
         self.btn_connectwaapi.pack(side="left")
@@ -88,18 +88,19 @@ class MainWindow(tkinter.Tk, Observer):
                                         text="",
                                         padding=3)
         self.lbl_wproj_info.pack(side="left")
+
         # Create Log Section.
-        self.frame_log = ttk.Labelframe(self,
-                                        name="frame_log",
-                                        text="Log",
-                                        padding=3, border=1, relief="solid")
-        self.frame_log.grid(column=0, row=3, sticky="sw",
-                            padx=5, pady=3, ipadx=2, ipady=0,)
-        self.lbl_log = ttk.Label(self.frame_log,
-                                 name="lbl_log",
-                                 text="Welcome to WaapiStateBrowser!",
-                                 padding=3)
-        self.lbl_log.pack(side="left")
+        # self.frame_log = ttk.Labelframe(self,
+        #                                 name="frame_log",
+        #                                 text="Log",
+        #                                 padding=3, border=1, relief="solid")
+        # self.frame_log.grid(column=0, row=3, sticky="sw",
+        #                     padx=5, pady=3, ipadx=2, ipady=0,)
+        # self.lbl_log = ttk.Label(self.frame_log,
+        #                          name="lbl_log",
+        #                          text="Welcome to WaapiStateBrowser!",
+        #                          padding=3)
+        # self.lbl_log.pack(side="left")
 
         # Create StateBrowser Section.
         self.frame_statebrowser = ttk.Labelframe(self, name="frame_statebrowser",
@@ -115,27 +116,9 @@ class MainWindow(tkinter.Tk, Observer):
                                              text="State", width=25, anchor="center")
         self.lbl_title_statename.grid(column=1, row=0, sticky="EW")
 
-        # self.update_wproj_info()
-
-    def show_connecting_message(self):
-        self.lbl_wproj_info.config(text="Connecting to Wwise...")
+    def show_status_message(self, message=''):
+        self.lbl_wproj_info.config(text=message)
         self.lbl_wproj_info.update()
-
-    def update_wproj_info(self, wproj_info: dict = {}):
-        if any(wproj_info):
-            self.lbl_wproj_info.config(
-                text="Connected: " + wproj_info.get('name', "") + "<"+wproj_info.get('filePath', "") + ">")
-            self.btn_connectwaapi.config(text="Disconnect")
-            self.btn_connectwaapi.config(command=self.client.disconnect)
-            self.btn_connectwaapi['state'] = 'normal'
-            self.btn_forceupdate['state'] = 'normal'
-            self.btn_setstate['state'] = 'normal'
-        else:
-            self.lbl_wproj_info.config(
-                text="NotConnected: Check Wwise is running and WAAPI is enabled.")
-            self.btn_connectwaapi.config(text="Connect")
-            self.btn_forceupdate['state'] = 'disabled'
-            self.btn_setstate['state'] = 'disabled'
 
     def clear_statebrowser(self):
         for stategroup in self.dict_statebrowser_object.keys():
@@ -167,7 +150,7 @@ class MainWindow(tkinter.Tk, Observer):
 
             self.dict_statebrowser_object[stategroup_id].setdefault(
                 'ComboBox', ttk.Combobox(self.frame_statebrowser,
-                                         name=stategroup_id,
+                                         name='cmb_'+stategroup_id,
                                          state='readonly',
                                          width=25,
                                          values=combobox_values))
@@ -221,11 +204,21 @@ class MainWindow(tkinter.Tk, Observer):
         # Add new State in dict_changedstate.
         self.dict_changedstate[event.widget._name] = event.widget.get()
 
+    def on_waapi_connected(self, client: StateUtility):
+        self.client = client
+        self.lbl_wproj_info.config(
+            text="Connected: " + client.wproj_info.get('name', "") + "<"+client.wproj_info.get('filePath', "") + ">")
+        self.btn_forceupdate['state'] = 'normal'
+        self.btn_setstate['state'] = 'normal'
+        self.dict_state_in_wwise = client.state_in_wwise
+        self.update_statebrowser()
+
     def on_waapi_disconnected(self, client: StateUtility):
         self.client = None
-
-    def on_wproj_postclosed(self, client: StateUtility):
-        self.update_wproj_info()
+        self.lbl_wproj_info.config(
+            text="NotConnected: Check Wwise is running and WAAPI is enabled.")
+        self.btn_forceupdate['state'] = 'disabled'
+        self.btn_setstate['state'] = 'disabled'
 
     def on_statename_changed(self, client: StateUtility):
         if self.enable_autosync.get() == False:
